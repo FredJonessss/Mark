@@ -1,0 +1,89 @@
+SA.require(['SA.UserCookie'], function(uc) {
+
+  'use strict';
+
+  var wrap = document.getElementById('hd-contrib-w'), source;
+
+  if(uc.has_contributor_details && wrap) {
+    var hrefLoc = uc.is_marketplace_author ? "/account/marketplace_dashboards" : "/account/authorboard_overview";
+    wrap.outerHTML = '<a href="' + hrefLoc + '" class="pull-right a-serv-btn a-tnd without-svg">Contributor Center</a>';
+  } else if(parseInt(uc.adblock_score, 10) > 7 && uc.passed_moderation && wrap) {
+    source = ['portfolio','mp_service'].indexOf(SA.pageConfig.name) !== -1 ? SA.pageConfig.name : window.location.pathname.split('/')[1];
+    wrap.outerHTML = '<a href="/page/become-a-seeking-alpha-contributor?source=' + source + '" sasource="' + source + '" class="pull-right a-serv-btn a-tnd without-svg">Become a Contributor</a>';
+  }
+
+}, 'hd-contrib-btn');
+SA.require(['SA.Fn.ajax', 'SA.UserCookie', 'SA.Data.Cache', 'SA.modLoader'], function(ajax, uc, cache, mod) {
+
+  'use strict';
+
+  var lK = 'last_notification_update', nK = 'notification_counter', last = parseInt(cache.get(lK), 10) || 0, count = parseInt(cache.get(nK), 10) || 0;
+
+  var now = Date.now(), s = uc.user_watchlist_slugs || '', d = document, wrap = d.getElementById('header-port-js');
+
+  function reset() {
+    cache.set(lK, now);
+    cache.set(nK, 0);
+  }
+
+  function insert(wrap) {
+    var n = d.createElement('span');
+    n.className = 'sa-notify';
+    n.innerHTML = count < 100 ? count : '99+';
+    wrap.appendChild(n);
+  }
+
+  function show() {
+    if(wrap && count > 0) {
+      mod.init('#header-port-js .sa-notify {right:12px;top:9px;}', function() {
+        insert(wrap);
+      }, 'port-notify');
+    }
+  }
+
+  function update() {
+    cache.set(lK, now);
+    cache.set(nK, count);
+  }
+
+  function deliver() {
+    ajax('/account/ajax_new_content_count?slugs=' + s + '&since=' + last, function(res) {
+      count = res.count;
+      update();
+      show();
+    });
+  }
+
+  function init() {
+    if(s && wrap) {
+      s = s.trim().split(',').slice(0, 150).join(',');
+      if(/^\/account\/portfolio/.test(window.location.pathname)) {
+        reset();
+      } else if(now - last > 300000) {
+        deliver();
+      } else {
+        show();
+      }
+    }
+  }
+
+  init();
+
+}, 'port-notifications');
+SA.require(['SA.UserCookie', 'SA.loadJS', 'SA.Data.Cache'], function(uc, loadJS, c) {
+
+  'use strict';
+
+  if(!uc.bounce_rule) {
+    c.del('bounce_msg_closed');
+    return c.del('bounce_renew_pressed');
+  }
+
+  if(!c.get('bounce_msg_closed') && !c.get('bounce_renew_pressed') && document.getElementById('main-nav-wrapper-row')) {
+    loadJS([{src: '/account/bounce_msg.js', id: 'bounce-popup'}]);
+  }
+
+}, 'bounce-popup');
+
+
+
